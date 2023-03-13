@@ -39,16 +39,33 @@ public class AccountServiceImpl implements AccountService{
 	@Autowired
 	TransactionsRestClient transactionRestClient;
 	
+	/**
+	 * Obtiene todas las cuentas
+	 * @return Flux<Account>
+	 */
 	@Override
 	public Flux<Account> getAll() {
 		return accountRepository.findAll();
 	}
 
+	/**
+	 * Obtiene la cuenta por su id
+	 * @param accountId
+	 * @return Mono<Account>
+	 */
 	@Override
 	public Mono<Account> getAccountById(String accountId) {
 		return accountRepository.findById(accountId);
 	}
 
+	/**
+	 * Registro de una cuenta para una persona
+	 * Se obtiene los movimientos y mantenimioento según el tipo de cuenta en getTypeAccount()
+	 * Se busca al cliente getPersonById() y se valida si ya tiene una cuenta en getAccountByIdCustomerPerson()
+	 * Si no tiene cuenta se crea la cuenta saveNewAccount()
+	 * @param accountRequestDto
+	 * @return Mono<AccountResponseDto>
+	 */
 	@Override
 	public Mono<AccountResponseDto> createAccountPerson(AccountRequestDto accountRequestDto) {
 		TypeAccountDto newAccount = getTypeAccount(accountRequestDto.getTypeAccount());
@@ -63,6 +80,13 @@ public class AccountServiceImpl implements AccountService{
 		}).defaultIfEmpty(new AccountResponseDto(null, "Client does not exist"));
 	}
 	
+	/**
+	 * Registro de una cuenta para una empresa
+	 * Se busca al cliente getCompanyById()
+	 * Se valida el tipo de cuenta y se crea la cuenta saveNewAccount()
+	 * @param accountRequestDto
+	 * @return Mono<AccountResponseDto>
+	 */
 	@Override
 	public Mono<AccountResponseDto> createAccountCompany(AccountRequestDto accountRequestDto) {
 		TypeAccountDto newAccount = getTypeAccount(accountRequestDto.getTypeAccount());
@@ -78,6 +102,13 @@ public class AccountServiceImpl implements AccountService{
 		}).defaultIfEmpty(new AccountResponseDto(null, "Client does not exist"));
 	}
 
+	/**
+	 * Actualización de una cuenta
+	 * Se obtiene una cuenta por el id findById()
+	 * Se guarda la cuenta save()
+	 * @param accountRequestDto
+	 * @return Mono<Account>
+	 */
 	@Override
 	public Mono<Account> updateAccount(AccountRequestDto accountRequestDto) {
 		return accountRepository.findById(accountRequestDto.getId())
@@ -96,6 +127,13 @@ public class AccountServiceImpl implements AccountService{
         });
 	}
 
+	/**
+	 * Eliminación de una cuenta
+	 * Se obtiene una cuenta por el id findById()
+	 * Se elimina la cuenta deleteById()
+	 * @param accountId
+	 * @return Mono<Message>
+	 */
 	@Override
 	public Mono<Message> deleteAccount(String accountId) {
 		Message message = new Message("Account does not exist");
@@ -106,6 +144,14 @@ public class AccountServiceImpl implements AccountService{
         }).defaultIfEmpty(message);
 	}
 	
+	/**
+	 * Depósito de una cuenta
+	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos
+	 * Se actualiza la cuenta con el deposito realizado save()
+	 * Se registra la transacción registerTransaction()
+	 * @param accountRequestDto
+	 * @return Mono<AccountResponseDto>
+	 */
 	@Override
 	public Mono<AccountResponseDto> depositAccount(AccountRequestDto accountRequestDto) {
 		LocalDateTime myDateObj = LocalDateTime.now();
@@ -124,6 +170,14 @@ public class AccountServiceImpl implements AccountService{
         });
 	}
 
+	/**
+	 * Retiro de una cuenta
+	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos
+	 * Se valida el monto a retirar y actualiza la cuenta con el retiro realizado save()
+	 * Se registra la transacción registerTransaction()
+	 * @param accountRequestDto
+	 * @return Mono<AccountResponseDto>
+	 */
 	@Override
 	public Mono<AccountResponseDto> withdrawalAccount(AccountRequestDto accountRequestDto) {
 		LocalDateTime myDateObj = LocalDateTime.now();
@@ -146,12 +200,22 @@ public class AccountServiceImpl implements AccountService{
         });
 	}
 
+	/**
+	 * Obtiene todas la cuentas por el id del cliente
+	 * @param customerId
+	 * @return Flux<Account>
+	 */
 	@Override
 	public Flux<Account> getAllAccountXCustomerId(String customerId) {
 		return accountRepository.findAll()
 				.filter(c -> c.getCustomerId().equals(customerId));
 	}
-
+	
+	/**
+	 * Reiniciar el numero de movimientos de las cuentas
+	 * Actualiza los movimientos permitidos a todas las cuentas en updateTransaction(); 
+	 * @return Mono<Message>
+	 */
 	@Override
 	public Mono<Message> restartTransactions() {
 		return updateTransaction().collectList().flatMap(c -> {
@@ -159,26 +223,48 @@ public class AccountServiceImpl implements AccountService{
 		});
 	}
 	
+	/**
+	 * Obtiene nombre, movimientos y mantenimiento según el tipo de cuenta
+	 * @param idType
+	 * @return TypeAccountDto
+	 */
 	private TypeAccountDto getTypeAccount(Integer idType) {
 		Predicate<TypeAccountDto> p = f -> f.getId()==idType;
 		TypeAccountDto type = typeAccount.getAccounts().filter(p).collect(Collectors.toList()).get(0);
 		return type;
     }
 
+	/**
+	 * Obtiene las cuentas según el id del cliente y tipo de cuenta
+	 * @param customerId
+	 * @param type
+	 * @return Mono<Account>
+	 */
 	private Mono<Account> getAccountByIdCustomerPerson(String customerId, String type) {
-		Flux<Account> r = accountRepository.findAll()
+		return  accountRepository.findAll()
 				.filter(c -> c.getCustomerId().equals(customerId))
-				.filter(c -> c.getDescripTypeAccount().equals(type));
-		Mono<Account> m= r.next();
-		return m;
+				.filter(c -> c.getDescripTypeAccount().equals(type))
+				.next();
 	}
 	
+	/**
+	 * Guarda una cuenta
+	 * @param account
+	 * @return Mono<AccountResponseDto>
+	 */
 	private Mono<AccountResponseDto> saveNewAccount(Account account) {
 		return accountRepository.save(account).flatMap(x -> {
 			return Mono.just(new AccountResponseDto(account, "Account created successfully"));
 		});
 	}
 	
+	/**
+	 * Registra una transacción
+	 * @param uAccount
+	 * @param amount
+	 * @param typeTransaction
+	 * @return Mono<AccountResponseDto>
+	 */
 	private Mono<AccountResponseDto> registerTransaction(Account uAccount, Double amount, String typeTransaction){
 		Transaction transaction = new Transaction();
 		transaction.setCustomerId(uAccount.getCustomerId());
@@ -193,6 +279,10 @@ public class AccountServiceImpl implements AccountService{
         });
 	}
 	
+	/**
+	 * Obtiene todas las transacciónes y actualiza el numero de transacciones permitidas
+	 * @return Flux<Account>
+	 */
 	private Flux<Account> updateTransaction(){
 		return  accountRepository.findAll()
 				.flatMap(c -> {
