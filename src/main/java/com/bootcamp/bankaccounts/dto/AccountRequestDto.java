@@ -1,9 +1,9 @@
 package com.bootcamp.bankaccounts.dto;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
 import lombok.Data;
 
 @Data
@@ -18,7 +18,7 @@ public class AccountRequestDto {
 	private Double maintenance;
 	private Integer transaction;
 	private Integer operationDay;
-	private Date dateAccount;
+	private LocalDateTime dateAccount;
 	private String NumberAccount;
 	private String typeCustomer;
 }

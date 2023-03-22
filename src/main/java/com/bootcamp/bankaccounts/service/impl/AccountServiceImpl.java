@@ -1,7 +1,7 @@
 package com.bootcamp.bankaccounts.service.impl;
 
 import java.time.LocalDateTime;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -14,6 +14,8 @@ import com.bootcamp.bankaccounts.dto.AccountRequestDto;
 import com.bootcamp.bankaccounts.dto.AccountResponseDto;
 import com.bootcamp.bankaccounts.dto.Message;
 import com.bootcamp.bankaccounts.dto.Transaction;
+import com.bootcamp.bankaccounts.dto.TransferRequestDto;
+import com.bootcamp.bankaccounts.dto.TransferResponseDto;
 import com.bootcamp.bankaccounts.dto.TypeAccountDto;
 import com.bootcamp.bankaccounts.entity.Account;
 import com.bootcamp.bankaccounts.repository.AccountRepository;
@@ -69,15 +71,15 @@ public class AccountServiceImpl implements AccountService{
 	@Override
 	public Mono<AccountResponseDto> createAccountPerson(AccountRequestDto accountRequestDto) {
 		TypeAccountDto newAccount = getTypeAccount(accountRequestDto.getTypeAccount());
-		Account account = new Account(null,accountRequestDto.getCustomerId(),accountRequestDto.getTypeAccount(),newAccount.getType(), 0.00
-				, newAccount.getMaintenance(), newAccount.getTransactions(), newAccount.getDayOperation()
-				, accountRequestDto.getDateAccount(), accountRequestDto.getNumberAccount(), accountRequestDto.getTypeCustomer());
+		Account account = new Account(null,accountRequestDto.getCustomerId(),accountRequestDto.getTypeAccount(),newAccount.getType(), accountRequestDto.getAmount()
+				, accountRequestDto.getAmount(), newAccount.getMaintenance(), newAccount.getTransactions(), newAccount.getDayOperation()
+				, LocalDateTime.now(), accountRequestDto.getNumberAccount(), accountRequestDto.getTypeCustomer(), newAccount.getCommission());
 		return customerRestClient.getPersonById(accountRequestDto.getCustomerId()).flatMap(c ->{
 			account.setTypeCustomer(c.getTypeCustomer());
 			return getAccountByIdCustomerPerson(accountRequestDto.getCustomerId(),newAccount.getType()).flatMap(v -> {
-				return Mono.just(new AccountResponseDto(null, "Personal client already has a bank account: "+newAccount.getType()));
+				return Mono.just(new AccountResponseDto("Personal client already has a bank account: "+newAccount.getType(), null));
 			}).switchIfEmpty(saveNewAccount(account));
-		}).defaultIfEmpty(new AccountResponseDto(null, "Client does not exist"));
+		}).defaultIfEmpty(new AccountResponseDto("Client does not exist", null));
 	}
 	
 	/**
@@ -90,16 +92,17 @@ public class AccountServiceImpl implements AccountService{
 	@Override
 	public Mono<AccountResponseDto> createAccountCompany(AccountRequestDto accountRequestDto) {
 		TypeAccountDto newAccount = getTypeAccount(accountRequestDto.getTypeAccount());
-		Account account = new Account(null,accountRequestDto.getCustomerId(),accountRequestDto.getTypeAccount(),newAccount.getType(), 0.00
-				, newAccount.getMaintenance(), newAccount.getTransactions(), newAccount.getDayOperation()
-				, accountRequestDto.getDateAccount(), accountRequestDto.getNumberAccount(), accountRequestDto.getTypeCustomer());	
+		
+		Account account = new Account(null,accountRequestDto.getCustomerId(),accountRequestDto.getTypeAccount(),newAccount.getType(), accountRequestDto.getAmount()
+				, accountRequestDto.getAmount(), newAccount.getMaintenance(), newAccount.getTransactions(), newAccount.getDayOperation()
+				, LocalDateTime.now(), accountRequestDto.getNumberAccount(), accountRequestDto.getTypeCustomer(), newAccount.getCommission());	
 		return customerRestClient.getCompanyById(accountRequestDto.getCustomerId()).flatMap(c ->{
 			account.setTypeCustomer(c.getTypeCustomer());
 			if(newAccount.getType().equals("C_CORRIENTE")) {
 				return saveNewAccount(account);
 			}
-			return Mono.just(new AccountResponseDto(null, "For company only type of account: C_CORRIENTE"));
-		}).defaultIfEmpty(new AccountResponseDto(null, "Client does not exist"));
+			return Mono.just(new AccountResponseDto("For company only type of account: C_CORRIENTE", null));
+		}).defaultIfEmpty(new AccountResponseDto("Client does not exist", null));
 	}
 
 	/**
@@ -146,35 +149,35 @@ public class AccountServiceImpl implements AccountService{
 	
 	/**
 	 * Depósito de una cuenta
-	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos
+	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos y comision
 	 * Se actualiza la cuenta con el deposito realizado save()
-	 * Se registra la transacción registerTransaction()
+	 * Se registra la transacción y si hay comusion se registra también registerTransaction() 
 	 * @param accountRequestDto
 	 * @return Mono<AccountResponseDto>
 	 */
 	@Override
 	public Mono<AccountResponseDto> depositAccount(AccountRequestDto accountRequestDto) {
 		LocalDateTime myDateObj = LocalDateTime.now();
-		return accountRepository.findById(accountRequestDto.getId()).filter(a -> a.getTransaction()>=0).flatMap(uAccount -> {
-			if(uAccount.getTransaction() - 1 >= 0) {
-				if(uAccount.getDescripTypeAccount().equals("PLAZO_FIJO") && uAccount.getOperationDay()!=myDateObj.getDayOfMonth()) {
-					return Mono.just(new AccountResponseDto(null, "Day of the month not allowed for PLAZO_FIJO"));
-				}
-				uAccount.setAmount(uAccount.getAmount() + accountRequestDto.getAmount());
-				uAccount.setTransaction(uAccount.getTransaction() - 1);
-	            return accountRepository.save(uAccount).flatMap(account -> {
-	            	return registerTransaction(uAccount, accountRequestDto.getAmount(),"DEPOSITO");
-	            });
+		return accountRepository.findById(accountRequestDto.getId()).flatMap(uAccount -> {
+			Double amount = uAccount.getAmount() + accountRequestDto.getAmount();
+			Double commission = uAccount.getTransaction() > 0 ? (0.0):(uAccount.getCommission());
+			if(amount < uAccount.getCommission()) return Mono.just(new AccountResponseDto("The operation cannot be carried out for an account amount less than the commission", null));
+			if(uAccount.getDescripTypeAccount().equals("PLAZO_FIJO") && uAccount.getOperationDay()!=myDateObj.getDayOfMonth()) {
+				return Mono.just(new AccountResponseDto("Day of the month not allowed for PLAZO_FIJO", null));
 			}
-			return Mono.just(new AccountResponseDto(null, "Exhausted monthly movements limit"));
-        });
+			uAccount.setAmount(amount-commission);
+			uAccount.setTransaction(uAccount.getTransaction()>0?(uAccount.getTransaction() - 1):(0));
+            return accountRepository.save(uAccount).flatMap(account -> {
+            	return registerTransaction(uAccount, accountRequestDto.getAmount(),"DEPOSITO", uAccount.getTransaction() > 0 ? 0:uAccount.getCommission());
+            });
+        }).defaultIfEmpty(new AccountResponseDto("Account does not exist", null));
 	}
 
 	/**
 	 * Retiro de una cuenta
-	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos
+	 * Se obtiene una cuenta por su id findById() y valida el numero de movimientos y comision
 	 * Se valida el monto a retirar y actualiza la cuenta con el retiro realizado save()
-	 * Se registra la transacción registerTransaction()
+	 * Se registra la transacción y si hay comusion se registra también registerTransaction() 
 	 * @param accountRequestDto
 	 * @return Mono<AccountResponseDto>
 	 */
@@ -182,22 +185,21 @@ public class AccountServiceImpl implements AccountService{
 	public Mono<AccountResponseDto> withdrawalAccount(AccountRequestDto accountRequestDto) {
 		LocalDateTime myDateObj = LocalDateTime.now();
 		return accountRepository.findById(accountRequestDto.getId()).flatMap(uAccount -> {
-			if(uAccount.getTransaction() - 1 >= 0) {
-				Double amount = uAccount.getAmount() - accountRequestDto.getAmount();
-				if(amount >= 0) {
-					if(uAccount.getDescripTypeAccount().equals("PLAZO_FIJO") && uAccount.getOperationDay()!=myDateObj.getDayOfMonth()) {
-						return Mono.just(new AccountResponseDto(null, "Day of the month not allowed for PLAZO_FIJO"));
-					}
-					uAccount.setAmount(amount);
-					uAccount.setTransaction(uAccount.getTransaction() - 1);
-		            return accountRepository.save(uAccount).flatMap(account -> {
-		            	return registerTransaction(uAccount, accountRequestDto.getAmount(),"RETIRO");
-		            });
+			Double amount = uAccount.getAmount() - accountRequestDto.getAmount();
+			Double commission = uAccount.getTransaction() > 0 ? (0.0):(uAccount.getCommission());
+			if(amount >= 0) {
+				if(uAccount.getDescripTypeAccount().equals("PLAZO_FIJO") && uAccount.getOperationDay()!=myDateObj.getDayOfMonth()) {
+					return Mono.just(new AccountResponseDto("Day of the month not allowed for PLAZO_FIJO", null));
 				}
-				return Mono.just(new AccountResponseDto(null, "You don't have enough balance"));
+				if(amount < uAccount.getCommission()) return Mono.just(new AccountResponseDto("The operation cannot be carried out for an account amount less than the commission", null));
+				uAccount.setAmount(amount-commission);
+				uAccount.setTransaction(uAccount.getTransaction()>0?(uAccount.getTransaction() - 1):(0));
+	            return accountRepository.save(uAccount).flatMap(account -> {
+	            	return registerTransaction(uAccount, accountRequestDto.getAmount(),"RETIRO", uAccount.getTransaction()>0?0:uAccount.getCommission());
+	            });
 			}
-			return Mono.just(new AccountResponseDto(null, "Exhausted monthly movements limit"));
-        });
+			return Mono.just(new AccountResponseDto("You don't have enough balance", null));
+        }).defaultIfEmpty(new AccountResponseDto("Account does not exist", null));
 	}
 
 	/**
@@ -248,13 +250,15 @@ public class AccountServiceImpl implements AccountService{
 	}
 	
 	/**
-	 * Guarda una cuenta
+	 * Guarda una cuenta y registra el monto de apertura
 	 * @param account
 	 * @return Mono<AccountResponseDto>
 	 */
 	private Mono<AccountResponseDto> saveNewAccount(Account account) {
 		return accountRepository.save(account).flatMap(x -> {
-			return Mono.just(new AccountResponseDto(account, "Account created successfully"));
+			return registerTransaction(account, account.getAmount(),"APERTURA", 0.0).flatMap(t1 -> {
+				return Mono.just(new AccountResponseDto("Account created successfully", x));
+			});
 		});
 	}
 	
@@ -265,17 +269,25 @@ public class AccountServiceImpl implements AccountService{
 	 * @param typeTransaction
 	 * @return Mono<AccountResponseDto>
 	 */
-	private Mono<AccountResponseDto> registerTransaction(Account uAccount, Double amount, String typeTransaction){
+	private Mono<AccountResponseDto> registerTransaction(Account uAccount, Double amount, String typeTransaction, Double commission){
 		Transaction transaction = new Transaction();
 		transaction.setCustomerId(uAccount.getCustomerId());
 		transaction.setProductId(uAccount.getId());
 		transaction.setProductType(uAccount.getDescripTypeAccount());
 		transaction.setTransactionType(typeTransaction);
 		transaction.setAmount(amount);
-		transaction.setTransactionDate(new Date());
+		transaction.setTransactionDate(LocalDateTime.now());
 		transaction.setCustomerType(uAccount.getTypeCustomer());
+		transaction.setBalance(uAccount.getAmount());
 		return transactionRestClient.createTransaction(transaction).flatMap(t -> {
-			return Mono.just(new AccountResponseDto(uAccount, "Successful transaction"));
+			if(commission>0) {
+				transaction.setAmount(commission);
+				transaction.setTransactionType("COMISION");
+				return transactionRestClient.createTransaction(transaction).flatMap(d -> {
+					return Mono.just(new AccountResponseDto("Successful transaction", uAccount));
+				});
+			}
+			return Mono.just(new AccountResponseDto("Successful transaction", uAccount));
         });
 	}
 	
@@ -289,6 +301,52 @@ public class AccountServiceImpl implements AccountService{
 					c.setTransaction(getTypeAccount(c.getTypeAccount()).getTransactions());
 					return accountRepository.save(c);
 				});
+	}
+
+	@Override
+	public Mono<TransferResponseDto> transferBetweenAccounts(TransferRequestDto transferRequestDto) {
+		return accountRepository.findById(transferRequestDto.getOriginAccount()).flatMap(a -> {
+			return accountRepository.findById(transferRequestDto.getDestinationAccount()).filter(c -> !c.getId().equals(a.getId())).flatMap(b -> {
+				if(a.getCustomerId().equals(b.getCustomerId())) {
+					if(a.getAmount() - transferRequestDto.getAmount() < 0)
+						return Mono.just(new TransferResponseDto("You do not have a sufficient balance in your origin account", null));
+					a.setAmount(a.getAmount() - transferRequestDto.getAmount());
+					b.setAmount(b.getAmount() + transferRequestDto.getAmount());
+		            return accountRepository.save(a).flatMap(account1 -> {
+		            	return accountRepository.save(b).flatMap(account2 -> {
+		            		return registerTransaction(account1, transferRequestDto.getAmount(),"TRANSFERENCIA ENTRE CUENTAS - RETIRO", 0.0).flatMap(t1 -> {
+		            			return registerTransaction(account2, transferRequestDto.getAmount(),"TRANSFERENCIA ENTRE CUENTAS - DEPOSITO", 0.0).flatMap(t2 -> {
+		            				return Mono.just(new TransferResponseDto("Successful transaction between accounts", Arrays.asList(a,b)));
+		            			});
+		            		});
+		            	});
+		            });
+				}else {
+					return Mono.just(new TransferResponseDto("Accounts are not from the same client", null));
+				}
+			}).defaultIfEmpty(new TransferResponseDto("Destination Account does not exist, enter another account", null));
+		}).defaultIfEmpty(new TransferResponseDto("Origin Account does not exist", null));
+	}
+
+	@Override
+	public Mono<TransferResponseDto> transferThirdParty(TransferRequestDto transferRequestDto) {
+		return accountRepository.findById(transferRequestDto.getOriginAccount()).flatMap(a -> {
+			return accountRepository.findById(transferRequestDto.getDestinationAccount()).filter(c -> !(c.getCustomerId().equals(a.getCustomerId()))).flatMap(b -> {
+				if(a.getAmount() - transferRequestDto.getAmount() < 0)
+					return Mono.just(new TransferResponseDto("You do not have a sufficient balance in your origin account", null));
+				a.setAmount(a.getAmount() - transferRequestDto.getAmount());
+				b.setAmount(b.getAmount() + transferRequestDto.getAmount());
+	            return accountRepository.save(a).flatMap(account1 -> {
+	            	return accountRepository.save(b).flatMap(account2 -> {
+	            		return registerTransaction(account1, transferRequestDto.getAmount(),"TRANSFERENCIA A TERCEROS - RETIRO", 0.0).flatMap(t1 -> {
+	            			return registerTransaction(account2, transferRequestDto.getAmount(),"TRANSFERENCIA A TERCEROS - DEPOSITO", 0.0).flatMap(t2 -> {
+	            				return Mono.just(new TransferResponseDto("successful third-party account transaction", Arrays.asList(a,b)));
+	            			});
+	            		});
+	            	});
+	            });
+			}).defaultIfEmpty(new TransferResponseDto("Destination Account does not exist, enter another account", null));
+		}).defaultIfEmpty(new TransferResponseDto("Origin Account does not exist", null));
 	}
 	
 }

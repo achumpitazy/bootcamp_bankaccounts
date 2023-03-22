@@ -13,10 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bootcamp.bankaccounts.dto.AccountRequestDto;
 import com.bootcamp.bankaccounts.dto.AccountResponseDto;
 import com.bootcamp.bankaccounts.dto.Message;
+import com.bootcamp.bankaccounts.dto.TransferRequestDto;
+import com.bootcamp.bankaccounts.dto.TransferResponseDto;
 import com.bootcamp.bankaccounts.entity.Account;
 import com.bootcamp.bankaccounts.service.AccountService;
 
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -95,7 +97,7 @@ public class AccountController {
 	 */
 	@PostMapping("/deposit")
     public Mono<AccountResponseDto> depositAccount(@RequestBody @Valid AccountRequestDto accountRequestDto) {
-		return (accountService.depositAccount(accountRequestDto));
+		return accountService.depositAccount(accountRequestDto);
     }
 	
 	/**
@@ -105,7 +107,7 @@ public class AccountController {
 	 */
 	@PostMapping("/withdrawal")
     public Mono<AccountResponseDto> withdrawalAccount(@RequestBody @Valid AccountRequestDto accountRequestDto) {
-		return (accountService.withdrawalAccount(accountRequestDto));
+		return accountService.withdrawalAccount(accountRequestDto);
     }
 	
 	/**
@@ -126,5 +128,24 @@ public class AccountController {
     public Mono<Message> restartTransactions(){
 		return accountService.restartTransactions();
     }
+
+	/**
+	 * Transferencia entre propias cuentas
+	 * @param transferRequestDto
+	 * @return Mono<TransferResponseDto>
+	 */
+	@PostMapping("/transfer")
+    public Mono<TransferResponseDto> transferBetweenAccounts(@RequestBody @Valid TransferRequestDto transferRequestDto) {
+		return accountService.transferBetweenAccounts(transferRequestDto);
+    }
 	
+	/**
+	 * Transferencia entre cuenta de terceros
+	 * @param transferRequestDto
+	 * @return Mono<TransferResponseDto>
+	 */
+	@PostMapping("/transferthird")
+    public Mono<TransferResponseDto> transferThirdParty(@RequestBody @Valid TransferRequestDto transferRequestDto) {
+		return accountService.transferThirdParty(transferRequestDto);
+    }
 }
