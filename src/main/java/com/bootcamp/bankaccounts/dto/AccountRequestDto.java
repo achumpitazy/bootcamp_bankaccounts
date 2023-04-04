@@ -4,9 +4,11 @@ import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+@AllArgsConstructor
 public class AccountRequestDto {
 	private String id;
 	private String customerId;

@@ -19,7 +19,7 @@ public class Account {
 	@Id
 	private String id;
 	private String customerId;
-	@JsonIgnore
+	
 	private Integer typeAccount;
 	private String descripTypeAccount;
 	private Double amount;

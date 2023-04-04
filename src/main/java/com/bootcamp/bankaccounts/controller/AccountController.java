@@ -47,7 +47,10 @@ public class AccountController {
 	 */
 	@GetMapping("/{accountId}")
     public Mono<Account> getAccountById(@PathVariable String accountId){
-		return accountService.getAccountById(accountId);
+		return accountService.getAccountById(accountId).flatMap(c -> {
+			System.out.println("PREBA "+c);
+			return Mono.just(c);
+		}).defaultIfEmpty(new Account());
     }
 	
 	/**
