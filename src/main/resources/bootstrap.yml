@@ -1,6 +1,14 @@
-server:
-  port: 8085
+#server:
+#  port: 8085
+#spring:
+#  data:
+#    mongodb:
+#      uri: mongodb://localhost:27017/accounts
 spring:
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/accounts
+  application:
+    name: bankaccounts
+  cloud:
+    config:
+      uri: http://localhost:8891
+      username: consumer
+      password: consumer

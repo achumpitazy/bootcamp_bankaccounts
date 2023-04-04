@@ -113,21 +113,21 @@ public class AccountServiceImpl implements AccountService{
 	 * @return Mono<Account>
 	 */
 	@Override
-	public Mono<Account> updateAccount(AccountRequestDto accountRequestDto) {
+	public Mono<Account> updateAccount(Account accountRequestDto) {
 		return accountRepository.findById(accountRequestDto.getId())
                 .flatMap(uAccount -> {
-                	uAccount.setCustomerId(accountRequestDto.getCustomerId());
-                	uAccount.setTypeAccount(accountRequestDto.getTypeAccount());
-                	uAccount.setDescripTypeAccount(getTypeAccount(accountRequestDto.getTypeAccount()).getType());
+//                	uAccount.setCustomerId(accountRequestDto.getCustomerId());
+//                	uAccount.setTypeAccount(accountRequestDto.getTypeAccount());
+//                	uAccount.setDescripTypeAccount(getTypeAccount(accountRequestDto.getTypeAccount()).getType());
                 	uAccount.setAmount(accountRequestDto.getAmount());
-                	uAccount.setMaintenance(accountRequestDto.getMaintenance());
-                	uAccount.setTransaction(accountRequestDto.getTransaction());
-                	uAccount.setOperationDay(accountRequestDto.getOperationDay());
-                	uAccount.setDateAccount(accountRequestDto.getDateAccount());
-                	uAccount.setNumberAccount(accountRequestDto.getNumberAccount());
-                	uAccount.setTypeCustomer(accountRequestDto.getTypeCustomer());
+//                	uAccount.setMaintenance(accountRequestDto.getMaintenance());
+//                	uAccount.setTransaction(accountRequestDto.getTransaction());
+//                	uAccount.setOperationDay(accountRequestDto.getOperationDay());
+//                	uAccount.setDateAccount(accountRequestDto.getDateAccount());
+//                	uAccount.setNumberAccount(accountRequestDto.getNumberAccount());
+//                	uAccount.setTypeCustomer(accountRequestDto.getTypeCustomer());
                     return accountRepository.save(uAccount);
-        });
+        }).defaultIfEmpty(new Account());
 	}
 
 	/**

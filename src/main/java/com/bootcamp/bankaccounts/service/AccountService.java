@@ -11,7 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface AccountService {
-
+	
 	Flux<Account> getAll();
 
 	Mono<Account> getAccountById(String accountId);
@@ -20,7 +20,7 @@ public interface AccountService {
 	
 	Mono<AccountResponseDto> createAccountCompany(AccountRequestDto accountRequestDto);
 
-	Mono<Account> updateAccount(AccountRequestDto accountRequestDto);
+	Mono<Account> updateAccount(Account accountRequestDto);
 
 	Mono<Message> deleteAccount(String accountId);
 	

@@ -18,7 +18,7 @@ import com.bootcamp.bankaccounts.dto.TransferResponseDto;
 import com.bootcamp.bankaccounts.entity.Account;
 import com.bootcamp.bankaccounts.service.AccountService;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -76,7 +76,7 @@ public class AccountController {
 	 * @return Mono<Account>
 	 */
 	@PutMapping
-	public Mono<Account> updateAccount(@RequestBody AccountRequestDto accountRequestDto){
+	public Mono<Account> updateAccount(@RequestBody Account accountRequestDto){
 		return accountService.updateAccount(accountRequestDto);
     }
 	
